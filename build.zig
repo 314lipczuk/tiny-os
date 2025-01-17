@@ -48,7 +48,7 @@ pub fn build(b: *std.Build) void {
         .target = resolved_target,
         .optimize = optimize,
         .strip = false,
-        .code_model = .kernel,
+        //.code_model = .kernel, // TODO: this flag throws LLVM error. check what it does and why.
     });
     exe.setLinkerScript(b.path("src/kernel.ld"));
 
