@@ -1,8 +1,6 @@
 const std = @import("std");
-const Crosstarget = std.zig.CrossTarget;
 const Target = std.Target;
 const Feature = std.Target.Cpu.Feature;
-
 // Although this function looks imperative, note that its job is to
 // declaratively construct a build graph that will be executed by an external
 // runner.
@@ -23,15 +21,25 @@ pub fn build(b: *std.Build) void {
     features_disabled.addFeature(@intFromEnum(features.f));
 
     features_enabled.addFeature(@intFromEnum(features.m));
+    features_enabled.removeFeatureSet(features_disabled);
 
-    const target = Crosstarget{
-        .cpu_arch = Target.Cpu.Arch.riscv32,
-        .os_tag = Target.Os.Tag.freestanding,
+    //Target.Cpu.Model.generic(Target.Cpu.Arch.riscv32);
+
+    const target = Target{
+        .cpu = .{ .arch = Target.Cpu.Arch.riscv32, .model = Target.Cpu.Model.generic(Target.Cpu.Arch.riscv32), .features = features_enabled },
+        .os = .{ .tag = Target.Os.Tag.freestanding },
         .abi = Target.Abi.none,
-        .cpu_model = .{ .explicit = &Target.riscv.cpu.generic_rv32 },
-        .cpu_features_sub = features_disabled,
-        .cpu_features_add = features_enabled,
     };
+
+    // const target = Target{
+    //     .cpu_arch = Target.Cpu.Arch.riscv32,
+    //     .os_tag = Target.Os.Tag.freestanding,
+    //     .abi = Target.Abi.none,
+    //     .cpu_model = .{ .explicit = &Target.riscv.cpu.generic_rv32 },
+    //     .cpu_features_sub = features_disabled,
+    //     .cpu_features_add = features_enabled,
+    // };
+
     // Standard optimization options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
@@ -40,6 +48,7 @@ pub fn build(b: *std.Build) void {
     const exe = b.addExecutable(.{
         .name = "os-tiny",
         .root_source_file = b.path("src/main.zig"),
+        //.target = .{ .query = target, .result =  },
         .target = target,
         .optimize = optimize,
         .strip = false,
