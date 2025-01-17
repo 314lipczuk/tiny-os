@@ -5,9 +5,21 @@ extern const __bss: [*]u8;
 extern const __bss_end: [*]u8;
 extern const __stack_top: [*]u8;
 
-pub fn kernel_main() linksection(".text.boot") callconv(.Naked) noreturn {
-    //asm volatile ("la sp, _sstack"); // set stack pointer
+const SYSCON_REG_ADDR: usize = 0x11100000;
+const UART_BUF_REG_ADDR: usize = 0x10000000;
+
+const syscon: *volatile u32 = @ptrFromInt(SYSCON_REG_ADDR);
+const uart_buf_reg: *volatile u8 = @ptrFromInt(UART_BUF_REG_ADDR);
+
+//TODO: figure out the linker script fuckups
+pub fn _start() linksection("boot") callconv(.Naked) noreturn {
+    asm volatile ("la sp, _sstack"); // set stack pointer
     memset(__bss, 0, __bss_end - __bss);
+    for ("Hello world\n") |b| {
+        uart_buf_reg.* = b;
+    }
+    syscon.* = 0x5555;
+    while (true) {}
 }
 
 pub fn memset(buf: *anyopaque, c: u8, n: usize) void {
@@ -17,4 +29,4 @@ pub fn memset(buf: *anyopaque, c: u8, n: usize) void {
         b[i] = c;
     }
     //return b;
-}
+} // ab

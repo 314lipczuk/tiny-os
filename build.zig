@@ -40,6 +40,8 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
+
+    //TODO: name is constantly fucking with install name. One wants to add .bin at the end, second wants it raw. figure out to marry them later on
     const resolved_target = std.Build.ResolvedTarget{ .result = target, .query = target_1 };
     const exe = b.addExecutable(.{
         .name = "os-tiny",
