@@ -10,58 +10,24 @@ pub fn build(b: *std.Build) void {
     // means any target is allowed, and the default is native. Other options
     // for restricting supported target set are available.
 
-    const features = Target.riscv.Feature;
-    var features_disabled = Feature.Set.empty;
-    var features_enabled = Feature.Set.empty;
-
-    features_disabled.addFeature(@intFromEnum(features.a));
-    features_disabled.addFeature(@intFromEnum(features.c));
-    features_disabled.addFeature(@intFromEnum(features.d));
-    features_disabled.addFeature(@intFromEnum(features.e));
-    features_disabled.addFeature(@intFromEnum(features.f));
-
-    features_enabled.addFeature(@intFromEnum(features.m));
-    features_enabled.removeFeatureSet(features_disabled);
-
-    //Target.Cpu.Model.generic(Target.Cpu.Arch.riscv32);
-
-    const target = Target{ .cpu = .{ .arch = Target.Cpu.Arch.riscv32, .model = Target.Cpu.Model.generic(Target.Cpu.Arch.riscv32), .features = features_enabled }, .os = .{ .tag = Target.Os.Tag.freestanding, .version_range = .{ .none = {} } }, .abi = Target.Abi.none, .ofmt = .raw };
-
-    const target_1 = std.Target.Query{
-        .cpu_arch = Target.Cpu.Arch.riscv32,
-        .os_tag = Target.Os.Tag.freestanding,
-        .abi = Target.Abi.none,
-        .cpu_model = .{ .explicit = &Target.riscv.cpu.generic_rv32 },
-        .cpu_features_sub = features_disabled,
-        .cpu_features_add = features_enabled,
-    };
-
-    // Standard optimization options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
-    // set a preferred release mode, allowing the user to decide how to optimize.
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
-
-    //TODO: name is constantly fucking with install name. One wants to add .bin at the end, second wants it raw. figure out to marry them later on
-    const resolved_target = std.Build.ResolvedTarget{ .result = target, .query = target_1 };
     const exe = b.addExecutable(.{
-        .name = "os-tiny",
+        .name = "kernel.elf",
         .root_source_file = b.path("src/main.zig"),
-        //.target = .{ .query = target, .result =  },
-        .target = resolved_target,
-        .optimize = optimize,
+        .target = b.resolveTargetQuery(.{
+            .cpu_arch = .riscv32,
+            .os_tag = .freestanding,
+            .abi = .none,
+        }),
+        .optimize = .ReleaseSmall,
         .strip = false,
         //.code_model = .kernel, // TODO: this flag throws LLVM error. check what it does and why.
     });
+    exe.entry = .disabled;
     exe.setLinkerScript(b.path("src/kernel.ld"));
 
     b.installArtifact(exe);
 
-    // This *creates* a Run step in the build graph, to be executed when another
-    // step is evaluated that depends on it. The next line below will establish
-    // such a dependency.
-
-    //const run_cmd = b.addRunArtifact(exe);
-    const cmd = &[_][]const u8{ "qemu-system-riscv32", "-machine", "virt", "-bios", "default", "-nographic", "-serial", "mon:stdio", "--no-reboot", "--kernel", "zig-out/bin/os-tiny.bin" };
+    const cmd = &[_][]const u8{ "qemu-system-riscv32", "-machine", "virt", "-bios", "default", "-nographic", "-serial", "mon:stdio", "--no-reboot", "--kernel", "zig-out/bin/kernel.elf" };
     const run_cmd = b.addSystemCommand(cmd);
 
     // By making the run step depend on the install step, it will be run from the
