@@ -1,7 +1,7 @@
 const std = @import("std");
 
-extern const __bss: [*]u8;
-extern const __bss_end: [*]u8;
+const bss: [*]u8 = @extern([*]u8, .{ .name = "__bss" });
+const bss_end: [*]u8 = @extern([*]u8, .{ .name = "__bss_end" });
 const stack_top: [*]u8 = @extern([*]u8, .{ .name = "__stack_top" });
 
 const SYSCON_REG_ADDR: usize = 0x11100000;
@@ -25,8 +25,10 @@ export fn kernel_main() noreturn {
 }
 
 pub fn main() !void {
+    const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss);
+    @memset(bss[0..bss_len], 0);
     for ("Hello world\n") |b| {
-        uart_buf_reg.* = b;
+        uart_buf_reg.* = b; // we write bytes one by one to UART fifo register (and quemu prints them)
     }
-    syscon.* = 0x5555;
+    //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
 }
