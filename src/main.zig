@@ -21,16 +21,21 @@ export fn boot() linksection(".text.boot") callconv(.Naked) void {
 
 export fn kernel_main() noreturn {
     main() catch |err| std.debug.panic("{s}", .{@errorName(err)});
-    while (true) {}
+    while (true) {
+        asm volatile (
+            \\wfi
+        );
+    }
 }
 
 pub fn main() !void {
     const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss);
     @memset(bss[0..bss_len], 0);
     for ("Hello world\n") |b| {
-        //uart_buf_reg.* = b; // we write bytes one by one to UART fifo register (and quemu prints them)
         puchar_sbi(b);
     }
+    //std.debug.print("hello, world in default print", .{});
+
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
 }
 
@@ -59,10 +64,54 @@ fn sbi_call(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize, arg
     return sbi_ret{ .error_ = a0, .value = a1 };
 }
 
+// two different ways of doing console printing.
+// sbi call communicates with qemu by using its own UART driver, and qemu sends it to std out.
 fn puchar_sbi(c: u8) void {
     _ = sbi_call(c, 0, 0, 0, 0, 0, 0, 1);
 }
-
-fn putchar(c: u8) void {
+// uart putchar instead does immediately send the character to uart register in memory
+fn putchar_uart(c: u8) void {
     uart_buf_reg.* = c;
 }
+const putchar = putchar_uart;
+
+fn print(comptime format: []const u8, args: anytype) void {
+    std.debug.assert(format.len != 0);
+    var current_arg: usize = 0;
+    var i: usize = 0;
+    var c: u8 = undefined;
+    while (i < format.len) : (i += 1) {
+        c = format[i];
+        switch (c) {
+            '\\' => { // escape
+                if (i + 1 == format.len) return;
+                const next_tok = c[i + 1];
+                putchar(next_tok);
+                i += 1;
+            },
+            '{' => {
+                if (i + 2 < format.len or current_arg < args.len) return;
+                switch (format[i + 1]) {
+                    'x' => {
+                        const arg: anyopaque = args[current_arg];
+                        _ = arg; // autofix
+                        // uuh
+
+                    },
+                    'd' => {},
+                    's' => {},
+                    else => @compileError("Wrong format string value type"),
+                }
+                current_arg += 1;
+
+                // while (i < format.len or format[i] != '}') i += 1;
+                // if (i == format.len) return;
+
+            },
+            else => {},
+        }
+    }
+}
+
+// fn print(comptime u :i32) void {
+// }
