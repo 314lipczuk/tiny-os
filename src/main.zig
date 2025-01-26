@@ -108,14 +108,12 @@ fn print(comptime format: []const u8, args: anytype) void {
                 if (format[i - 1] == '{') continue;
                 putchar(c);
             },
-            '}' => {
-                if (format[i - 1] == '\\' and format[i - 2] != '\\') putchar('}'); // TODO: same for other
+            '}' => { // TODO: same for other control characters
+                if (format[i - 1] == '\\' and format[i - 2] != '\\') putchar('}');
             },
             '{' => {
-                // if (i + 2 < format.len or current_arg >= field_info.len) return;
-                //if (i + 2 < format.len) return;
+                if (i + 2 < format.len or current_arg >= field_info.len) return;
                 const field = field_info[current_arg];
-                //const field = @field(args, i);
                 const value = @field(args, field.name);
 
                 switch (format[i + 1]) {
@@ -144,6 +142,3 @@ fn print(comptime format: []const u8, args: anytype) void {
         }
     }
 }
-
-// fn print(comptime u :i32) void {
-// }
