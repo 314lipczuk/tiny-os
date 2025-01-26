@@ -31,9 +31,10 @@ export fn kernel_main() noreturn {
 pub fn main() !void {
     const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss);
     @memset(bss[0..bss_len], 0);
-    for ("Hello world\n") |b| {
-        puchar_sbi(b);
-    }
+    // for ("Hello world\n") |b| {
+    //     puchar_sbi(b);
+    // }
+    print("abcc", .{});
     //std.debug.print("hello, world in default print", .{});
 
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
@@ -76,7 +77,11 @@ fn putchar_uart(c: u8) void {
 const putchar = putchar_uart;
 
 fn print(comptime format: []const u8, args: anytype) void {
-    std.debug.assert(format.len != 0);
+    comptime std.debug.assert(format.len != 0);
+    const ArgsType = @TypeOf(args);
+    const args_type_info = @typeInfo(args);
+    const field_info = args_type_info.@"struct".fields;
+    const args_state :std.fmt.ArgState = .{.args_len = field_info.len};
     var current_arg: usize = 0;
     var i: usize = 0;
     var c: u8 = undefined;
@@ -85,7 +90,7 @@ fn print(comptime format: []const u8, args: anytype) void {
         switch (c) {
             '\\' => { // escape
                 if (i + 1 == format.len) return;
-                const next_tok = c[i + 1];
+                const next_tok = format[i + 1];
                 putchar(next_tok);
                 i += 1;
             },
@@ -93,10 +98,13 @@ fn print(comptime format: []const u8, args: anytype) void {
                 if (i + 2 < format.len or current_arg < args.len) return;
                 switch (format[i + 1]) {
                     'x' => {
-                        const arg: anyopaque = args[current_arg];
-                        _ = arg; // autofix
-                        // uuh
-
+                        // const ptr: usize = @intFromPtr(args[current_arg]);
+                        const ptr: usize = args_state.next_arg;
+                        for (7..0) |j| {
+                            const nibble = (ptr >> (j * 4)) & 0xf;
+                            putchar("0123456789abcdef"[nibble]);
+                        }
+                        args_state.nextArg()
                     },
                     'd' => {},
                     's' => {},
@@ -108,7 +116,9 @@ fn print(comptime format: []const u8, args: anytype) void {
                 // if (i == format.len) return;
 
             },
-            else => {},
+            else => {
+                putchar(c[i]);
+            },
         }
     }
 }
