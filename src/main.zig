@@ -34,7 +34,9 @@ pub fn main() !void {
     // for ("Hello world\n") |b| {
     //     puchar_sbi(b);
     // }
-    print("abcc", .{});
+    const x: u32 = 1;
+    print("abcc {x}  ", .{&x});
+
     //std.debug.print("hello, world in default print", .{});
 
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
@@ -74,50 +76,70 @@ fn puchar_sbi(c: u8) void {
 fn putchar_uart(c: u8) void {
     uart_buf_reg.* = c;
 }
+
 const putchar = putchar_uart;
 
 fn print(comptime format: []const u8, args: anytype) void {
-    comptime std.debug.assert(format.len != 0);
-    const ArgsType = @TypeOf(args);
-    const args_type_info = @typeInfo(args);
-    const field_info = args_type_info.@"struct".fields;
-    const args_state :std.fmt.ArgState = .{.args_len = field_info.len};
-    var current_arg: usize = 0;
-    var i: usize = 0;
-    var c: u8 = undefined;
-    while (i < format.len) : (i += 1) {
+    const args_type_info = @typeInfo(@TypeOf(args));
+    const field_info = args_type_info.Struct.fields;
+
+    comptime {
+        std.debug.assert(format.len != 0);
+        if (args_type_info != .Struct or !args_type_info.Struct.is_tuple) {
+            @compileError("Expected a tuple or a struct in kernel print");
+        }
+    }
+
+    comptime var current_arg: usize = 0;
+    comptime var i: usize = 0;
+    comptime var c: u8 = undefined;
+    inline while (i < format.len) : (i += 1) {
         c = format[i];
         switch (c) {
             '\\' => { // escape
                 if (i + 1 == format.len) return;
                 const next_tok = format[i + 1];
                 putchar(next_tok);
-                i += 1;
+
+                // i += 1;
+                // TODO: i want to skip 2 tokens here, but since i'm unrolling this part at compile time, i+1 cannot happen in runtime code. So, I either have to make this work without skipping tokens, or .... idk actually; maybe instead of looking ahead i should look behind, and if there is a single \ sign before a token, then treat it as escape. Hmm, doesn't sound bad.
+            },
+            'x', 'd', 's' => {
+                if (format[i - 1] == '{') continue;
+                putchar(c);
+            },
+            '}' => {
+                if (format[i - 1] == '\\' and format[i - 2] != '\\') putchar('}'); // TODO: same for other
             },
             '{' => {
-                if (i + 2 < format.len or current_arg < args.len) return;
+                // if (i + 2 < format.len or current_arg >= field_info.len) return;
+                //if (i + 2 < format.len) return;
+                const field = field_info[current_arg];
+                //const field = @field(args, i);
+                const value = @field(args, field.name);
+
                 switch (format[i + 1]) {
                     'x' => {
-                        // const ptr: usize = @intFromPtr(args[current_arg]);
-                        const ptr: usize = args_state.next_arg;
-                        for (7..0) |j| {
-                            const nibble = (ptr >> (j * 4)) & 0xf;
+                        const ptr: usize = switch (@typeInfo(field.type)) {
+                            .Pointer => @intFromPtr(value),
+                            else => @intFromPtr(&value),
+                        };
+                        putchar('0');
+                        putchar('x');
+                        for (0..7) |j| {
+                            const shift: u5 = @intCast((7 - j) * 4);
+                            const nibble: usize = (ptr >> shift) & 0xf;
                             putchar("0123456789abcdef"[nibble]);
                         }
-                        args_state.nextArg()
                     },
                     'd' => {},
                     's' => {},
-                    else => @compileError("Wrong format string value type"),
+                    else => @compileError(format[i .. i + 1]),
                 }
                 current_arg += 1;
-
-                // while (i < format.len or format[i] != '}') i += 1;
-                // if (i == format.len) return;
-
             },
             else => {
-                putchar(c[i]);
+                putchar(c);
             },
         }
     }
