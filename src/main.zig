@@ -31,13 +31,9 @@ export fn kernel_main() noreturn {
 pub fn main() !void {
     const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss);
     @memset(bss[0..bss_len], 0);
-    // for ("Hello world\n") |b| {
-    //     puchar_sbi(b);
-    // }
     const x: u32 = 1;
-    print("abcc {x}  ", .{&x});
-
-    //std.debug.print("hello, world in default print", .{});
+    const text = "abcd";
+    print("abcc, {x} digit: {d}, string: {s} ", .{ &x, 123, text });
 
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
 }
@@ -112,7 +108,8 @@ fn print(comptime format: []const u8, args: anytype) void {
                 if (format[i - 1] == '\\' and format[i - 2] != '\\') putchar('}');
             },
             '{' => {
-                if (i + 2 < format.len or current_arg >= field_info.len) return;
+                if (i + 2 > format.len or current_arg >= field_info.len) return;
+                if (format[i - 1] != '\\' and format[i + 2] != '}') @compileError("{ char neither escaped nor part of var");
                 const field = field_info[current_arg];
                 const value = @field(args, field.name);
 
@@ -130,8 +127,30 @@ fn print(comptime format: []const u8, args: anytype) void {
                             putchar("0123456789abcdef"[nibble]);
                         }
                     },
-                    'd' => {},
-                    's' => {},
+                    'd' => {
+                        var val: u32 = value;
+                        if (val < 0) {
+                            putchar('-');
+                            val = -value;
+                        }
+                        var divisor: u32 = 1;
+                        while (val / divisor > 9) {
+                            divisor = divisor * 10;
+                        }
+
+                        while (divisor > 0) {
+                            putchar('0' + @as(u8, @truncate(val / divisor)));
+                            val %= divisor;
+                            divisor /= 10;
+                        }
+                    },
+                    's' => {
+                        //if (field.is_comptime) @compileError("{s} print supplied type that's not []u8");
+                        // TODO: make this check work, one day
+                        for (value) |v| {
+                            putchar(v);
+                        }
+                    },
                     else => @compileError(format[i .. i + 1]),
                 }
                 current_arg += 1;
