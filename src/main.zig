@@ -33,7 +33,8 @@ pub fn main() !void {
     @memset(bss[0..bss_len], 0);
     const x: u32 = 1;
     const text = "abcd";
-    print("abcc, {x} digit: {d}, string: {s} ", .{ &x, 123, text });
+    const somenum: u64 = 111;
+    print("{x}\tx={d}: \n{x}\ttext: {s}\n{x} anotherNum {d} ", .{ x, x, text, text, somenum, somenum });
 
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
 }
@@ -101,15 +102,15 @@ fn print(comptime format: []const u8, args: anytype) void {
                 // TODO: i want to skip 2 tokens here, but since i'm unrolling this part at compile time, i+1 cannot happen in runtime code. So, I either have to make this work without skipping tokens, or .... idk actually; maybe instead of looking ahead i should look behind, and if there is a single \ sign before a token, then treat it as escape. Hmm, doesn't sound bad.
             },
             'x', 'd', 's' => {
-                if (format[i - 1] == '{') continue;
+                if (i > 0 and format[i - 1] == '{') continue;
                 putchar(c);
             },
             '}' => { // TODO: same for other control characters
-                if (format[i - 1] == '\\' and format[i - 2] != '\\') putchar('}');
+                if (i > 0 and (format[i - 1] == '\\' and format[i - 2] != '\\')) putchar('}');
             },
             '{' => {
                 if (i + 2 > format.len or current_arg >= field_info.len) return;
-                if (format[i - 1] != '\\' and format[i + 2] != '}') @compileError("{ char neither escaped nor part of var");
+                if (i > 0 and format[i - 1] != '\\' and format[i + 2] != '}') @compileError("{ char neither escaped nor part of var");
                 const field = field_info[current_arg];
                 const value = @field(args, field.name);
 
