@@ -27,7 +27,6 @@ export fn kernel_main() noreturn {
         );
     }
 }
-
 pub fn main() !void {
     const bss_len = @intFromPtr(bss_end) - @intFromPtr(bss);
     @memset(bss[0..bss_len], 0);
@@ -35,6 +34,7 @@ pub fn main() !void {
     const text = "abcd";
     const somenum: u64 = 111;
     print("{x}\tx={d}: \n{x}\ttext: {s}\n{x} anotherNum {d} ", .{ x, x, text, text, somenum, somenum });
+    @panic("abcdeeee");
 
     //syscon.* = 0x5555; // send powerdown; commented, cause qemu restarts image, making it an infinite loop of hello worlds
 }
@@ -160,5 +160,14 @@ fn print(comptime format: []const u8, args: anytype) void {
                 putchar(c);
             },
         }
+    }
+}
+
+pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
+    _ = ret_addr; // autofix
+    _ = error_return_trace; // autofix
+    print("custom PANIC at {s}\n", .{msg});
+    while (true) {
+        asm volatile ("");
     }
 }
