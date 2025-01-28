@@ -10,6 +10,11 @@ const UART_BUF_REG_ADDR: usize = 0x10000000;
 const syscon: *volatile u32 = @ptrFromInt(SYSCON_REG_ADDR);
 const uart_buf_reg: *volatile u8 = @ptrFromInt(UART_BUF_REG_ADDR);
 
+// ================================
+// Current todos:
+// - understand and comment the kernel_entry function
+// - handle trap call -> implement
+
 export fn boot() linksection(".text.boot") callconv(.Naked) void {
     asm volatile (
         \\mv sp, %[stack_top]
