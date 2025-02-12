@@ -14,6 +14,7 @@ const uart_buf_reg: *volatile u8 = @ptrFromInt(UART_BUF_REG_ADDR);
 // Current todos:
 // - understand and comment the kernel_entry function
 // - handle trap call -> implement
+// - Adding stack traces to panic: https://andrewkelley.me/post/zig-stack-traces-kernel-panic-bare-bones-os.html
 
 export fn boot() linksection(".text.boot") callconv(.Naked) void {
     asm volatile (
@@ -52,7 +53,9 @@ fn kernel_entry() void {
 
     asm volatile (
         \\csrw sscratch, sp
+        //   write stack pointer into csr (control and status reg.)
         \\addi sp, sp, -4*31
+        //   move stack pointer down by 4*31 bytes (make space for 31 4-byte registers to be saved on the stack)
         \\sw ra, 4* 0(sp)
         \\sw gp, 4* 1(sp)
         \\sw tp, 4* 2(sp)
@@ -83,12 +86,20 @@ fn kernel_entry() void {
         \\sw s9, 4* 27(sp)
         \\sw s10, 4* 28(sp)
         \\sw s11, 4* 29(sp)
+        // save register [$1] into memory at offset sp
+        // using sw (store word)
         \\
         \\csrr a0, sscratch
+        // read value from sscratch csr into a0
+        // this restores stack pointer from before (downwards it has register data)
         \\sw a0, 4*30(sp)
+        // moves sp into a0,
+        // prepares stack frame to be passed into handle_trap function, as a0 is about to be used
         \\
         \\mv a0 sp
+        // sp is copied into a0, in order to pass argument to handle_trap
         \\call handle_trap
+        // actual code for handling trap. Implemented below
         \\
         \\lw ra, 4* 0(sp)
         \\lw gp, 4* 1(sp)
@@ -120,6 +131,7 @@ fn kernel_entry() void {
         \\lw    s9, 4* 27(sp)
         \\lw    s10, 4* 28(sp)
         \\lw    s11, 4* 29(sp)
+        // loading previously saved registers back.
         \\sret
     );
 }
