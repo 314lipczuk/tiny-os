@@ -83,7 +83,7 @@ fn kernel_entry() void {
         \\sw s6, 4* 24(sp)
         \\sw s7, 4* 25(sp)
         \\sw s8, 4* 26(sp)
-        \\sw s9, 4* 27(sp)
+        \\sw s9, 4* 27(sp) 
         \\sw s10, 4* 28(sp)
         \\sw s11, 4* 29(sp)
         // save register [$1] into memory at offset sp
@@ -135,6 +135,22 @@ fn kernel_entry() void {
         \\sret
     );
 }
+
+fn read_csr(comptime reg: []const u8) u64 {
+    var value: u64 = undefined;
+    asm volatile ("csrr %[result], " ++ reg
+        : [result] "=r" (value),
+    );
+    return value;
+}
+
+fn write_csr(comptime reg: []const u8, value: u32) void {
+    asm volatile ("csrw " ++ reg ++ ", %[value]"
+        :
+        : [value] "r" (value),
+    );
+}
+
 const sbi_ret = struct {
     error_: isize,
     value: usize,
